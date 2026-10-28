@@ -1,5 +1,17 @@
 import type { Message, ChatResponse } from "./types/message.ts";
 import * as readline from "readline";
+import { readFileTool } from "./tools.ts";
+
+const tools = [
+  {
+    type: "function",
+    function: {
+      description: readFileTool.description,
+      name: readFileTool.name,
+      parameters: readFileTool.parameters,
+    },
+  },
+];
 
 let messages: Array<Message> = [
   { role: "system", content: "You are a helpful assistant." },
@@ -41,6 +53,7 @@ async function handler(line: string) {
       messages,
       reasoning_effort: "low",
       stream: false,
+      tools,
     }),
   });
 
