@@ -2,6 +2,8 @@ import type { Message, ChatResponse, ToolMessage } from "./types/message.ts";
 import * as readline from "readline";
 import { readFileTool } from "./tools.ts";
 
+const MAX_STEPS = 30;
+
 const tools = [
   {
     type: "function",
@@ -45,7 +47,9 @@ async function handler(line: string) {
 
   messages.push({ role: "user", content: line });
 
-  while (true) {
+  let currentStep = 1;
+
+  while (currentStep <= MAX_STEPS) {
     const res = await fetch(baseurl!, {
       signal: AbortSignal.timeout(30_000),
       method: "POST",
@@ -67,23 +71,45 @@ async function handler(line: string) {
       const content = messageRes.choices[0]?.message.content;
       if (content) console.log(content);
 
-      messages.push(messageRes!.choices[0]!.message);
+      if (
+        messageRes.choices &&
+        messageRes.choices[0] &&
+        messageRes.choices[0].message
+      ) {
+        messages.push(messageRes.choices[0].message);
 
-      if (messageRes.choices[0]?.message.tool_calls) {
-        const toolMessages: ToolMessage[] = [];
+        if (messageRes.choices[0].message.tool_calls) {
+          const toolMessages: ToolMessage[] = [];
 
-        for (let tool of messageRes.choices[0].message.tool_calls) {
-          const toolRes = await toolExecutes[tool.function.name]!(
-            JSON.parse(tool.function.arguments),
-          );
-          toolMessages.push({
-            role: "tool",
-            tool_call_id: tool.id,
-            content: toolRes,
-          });
+          for (let tool of messageRes.choices[0].message.tool_calls) {
+            try {
+              // pre act
+              const targetTool = toolExecutes[tool.function.name];
+              const params = JSON.parse(tool.function.arguments);
+
+              if (targetTool) {
+                const toolRes = await targetTool(params);
+                toolMessages.push({
+                  role: "tool",
+                  tool_call_id: tool.id,
+                  content: toolRes,
+                });
+              } else {
+                throw new Error(`工具 ${tool.function.name} 不存在，请重试`);
+              }
+            } catch (e) {
+              toolMessages.push({
+                role: "tool",
+                tool_call_id: tool.id,
+                content: String(e),
+              });
+            }
+          }
+
+          messages.push(...toolMessages);
+        } else {
+          break;
         }
-
-        messages.push(...toolMessages);
       } else {
         break;
       }
@@ -92,6 +118,12 @@ async function handler(line: string) {
       process.exitCode = 1;
       break;
     }
+
+    currentStep++;
+  }
+
+  if (currentStep > MAX_STEPS) {
+    console.log("超出轮次限制");
   }
 }
 
