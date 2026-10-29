@@ -8,7 +8,7 @@ function resolveInsideCwd(input: string): string {
   const rel = path.relative(cwd, target);
 
   if (rel === ".." || rel.startsWith(".." + path.sep) || path.isAbsolute(rel)) {
-    throw new Error(`Error: 路径越界，只能访问工作目录内的文件：${input}`);
+    throw new Error(`路径越界，只能访问工作目录内的文件：${input}`);
   }
   return target;
 }
