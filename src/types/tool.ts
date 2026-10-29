@@ -1,6 +1,10 @@
 export interface StanderTool {
   name: string;
   description: string;
-  parameters: object;
+  parameters: {
+    type: "object";
+    required: Array<string>;
+    properties: object;
+  };
   execute: (args: any) => Promise<string>;
 }

@@ -1,6 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import type { StanderTool } from "./types/tool.ts";
 import path from "node:path";
+import { exec } from "node:child_process";
 
 function resolveInsideCwd(input: string): string {
   const cwd = process.cwd();
@@ -68,5 +69,32 @@ export const writeFileTool: StanderTool = {
     } catch (e) {
       return String(e);
     }
+  },
+};
+
+export const bashTool: StanderTool = {
+  name: "base_tool",
+  description: "在当前工作区运行一段命令。返回命令的结果。",
+  parameters: {
+    type: "object",
+    properties: {
+      command: {
+        type: "string",
+        description: "需要运行的命令",
+      },
+    },
+    required: ["command"],
+  },
+  execute: async (args: { command: string }) => {
+    const { stderr, stdout } = await exec(args.command, (error) => {
+      if (error) {
+        return `执行出错：${error}`;
+      }
+    });
+
+    return (
+      (stdout ? `标准输出：${stdout}。` : "") +
+      (stderr ? `标准错误：${stderr}。` : "")
+    );
   },
 };
