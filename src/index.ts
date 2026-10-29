@@ -1,6 +1,6 @@
 import type { Message, ChatResponse, ToolMessage } from "./types/message.ts";
 import * as readline from "readline";
-import { readFileTool, writeFileTool, bashTool } from "./tools.ts";
+import { readFileTool, writeFileTool, runCommandTool } from "./tools.ts";
 
 const MAX_STEPS = 30;
 
@@ -24,9 +24,9 @@ const tools = [
   {
     type: "function",
     function: {
-      description: bashTool.description,
-      name: bashTool.name,
-      parameters: bashTool.parameters,
+      description: runCommandTool.description,
+      name: runCommandTool.name,
+      parameters: runCommandTool.parameters,
     },
   },
 ];
@@ -34,7 +34,7 @@ const tools = [
 const toolExecutes = {
   [readFileTool.name]: readFileTool.execute,
   [writeFileTool.name]: writeFileTool.execute,
-  [bashTool.name]: bashTool.execute,
+  [runCommandTool.name]: runCommandTool.execute,
 };
 
 let messages: Array<Message> = [
