@@ -1,4 +1,4 @@
-import type { Message, ChatResponse } from "./types/message.ts";
+import type { Message, ChatResponse, ToolMessage } from "./types/message.ts";
 import * as readline from "readline";
 import { readFileTool } from "./tools.ts";
 
@@ -12,6 +12,10 @@ const tools = [
     },
   },
 ];
+
+const toolExecutes = {
+  [readFileTool.name]: readFileTool.execute,
+};
 
 let messages: Array<Message> = [
   { role: "system", content: "You are a helpful assistant." },
@@ -41,30 +45,53 @@ async function handler(line: string) {
 
   messages.push({ role: "user", content: line });
 
-  const res = await fetch(baseurl!, {
-    signal: AbortSignal.timeout(30_000),
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apikey}`,
-    },
-    body: JSON.stringify({
-      model: "deepseek-flash",
-      messages,
-      reasoning_effort: "low",
-      stream: false,
-      tools,
-    }),
-  });
+  while (true) {
+    const res = await fetch(baseurl!, {
+      signal: AbortSignal.timeout(30_000),
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apikey}`,
+      },
+      body: JSON.stringify({
+        model: "deepseek-flash",
+        messages,
+        reasoning_effort: "low",
+        stream: false,
+        tools,
+      }),
+    });
 
-  if (res.ok) {
-    const messageRes = (await res.json()) as ChatResponse;
-    const message = messageRes.choices[0]?.message.content ?? "";
-    console.log(message);
-    messages.push({ role: "assistant", content: message });
-  } else {
-    console.error(res.status, res.statusText, await res.text());
-    process.exitCode = 1;
+    if (res.ok) {
+      const messageRes = (await res.json()) as ChatResponse;
+      const content = messageRes.choices[0]?.message.content;
+      if (content) console.log(content);
+
+      messages.push(messageRes!.choices[0]!.message);
+
+      if (messageRes.choices[0]?.message.tool_calls) {
+        const toolMessages: ToolMessage[] = [];
+
+        for (let tool of messageRes.choices[0].message.tool_calls) {
+          const toolRes = await toolExecutes[tool.function.name]!(
+            JSON.parse(tool.function.arguments),
+          );
+          toolMessages.push({
+            role: "tool",
+            tool_call_id: tool.id,
+            content: toolRes,
+          });
+        }
+
+        messages.push(...toolMessages);
+      } else {
+        break;
+      }
+    } else {
+      console.error(res.status, res.statusText, await res.text());
+      process.exitCode = 1;
+      break;
+    }
   }
 }
 
